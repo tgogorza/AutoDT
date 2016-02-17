@@ -127,8 +127,8 @@ stats.norm <- stats.norm %>% mutate_each_(funs(normalize),vars=c("PT","Prom","Re
 #stats.norm <- stats.norm %>% mutate_each_(funs(as.numeric(scale(.))),vars=c("PT","Prom","Reg","PJ","F","GC","GP","GR","EC","VI","A","R","PE","PA"))
 
 formation <- "343"
-pSize <- 500
-executions <- 1
+pSize <- 300
+executions <- 100
 
 solPlayers <- {}
 
@@ -160,6 +160,7 @@ finalList <- count(solPlayers)
 finalList <- finalList[with(finalList,order(-freq)),]
 
 finalTeam <- stats[finalList$x,]
+finalTeam <- data.frame(finalTeam,finalList$freq)
 
 #sum(finalteam$Valor)
 #finalteam[with(finalteam,order(Pos)),]
