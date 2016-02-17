@@ -1,15 +1,7 @@
-# GenerateTeam <- function(stats){
-#   library(genalg)
-#   
-#   #Solve using Genetic Algorithm
-#   #evalutaion <- function(x){ sample(x = c(0,1), size = 890, prob = c(98.32,1.68), replace=TRUE) }
-#   solution <- rbga.bin(size=nrow(stats),zeroToOneRatio = 60,popSize=200, iters=50,
-#                        mutationChance=0.02, evalFunc=EvalFunc)
-#   last <- solution$population[200,]
-#   length(last[last != 0])
-#   team <- stats[which(last == 1),]
-#   
-# }
+library(GA)
+library(dplyr)
+setwd("D:/workspace/AutoDT")
+source("GetPlayerStats.R")
 
 normalize <- function(values) {
     max <- max(values)
@@ -25,25 +17,11 @@ getPlayersByID <- function(players,ids){
     filter(players,ID %in% ids)
 }
 
-# fitnessFunc <- function(chromosome){
-#     
-#     if(sum(chromosome$valor) > 60000000)
-#         return(Inf)
-#     
-#     #players <- stats[which(players == 1),]
-#     ARQ <- getPlayersByPos(chromosome,"ARQ")
-#     ARQfit <- sum(as.numeric(ARQ$PT)) + sum(as.numeric(ARQ$PJ)) + sum(as.numeric(ARQ$F))
-#     DEF <- getPlayersByPos(chromosome,"DEF")
-#     DEFfit <- sum(as.numeric(DEF$PT)) + sum(as.numeric(DEF$PJ)) + sum(as.numeric(DEF$F))
-#     MED <- getPlayersByPos(chromosome,"MED")
-#     MEDfit <- sum(as.numeric(MED$PT)) + sum(as.numeric(MED$PJ)) + sum(as.numeric(MED$F))
-#     DEL <- getPlayersByPos(chromosome,"DEL")
-#     DELfit <- sum(as.numeric(DEL$PT)) + sum(as.numeric(DEL$PJ)) + sum(as.numeric(DEL$F))
-#   
-#     fit <- ARQ + DEF + MED + DEL
-#     
-#     return (-fit)
-# }
+getRandomPlayers <- function(players, pos, count = 1){
+    playersbypos <- getPlayersByPos(players,pos)
+    indexes <- runif(n = count, min = 1, max = dim(playersbypos)[1])
+    playersbypos[indexes,"ID"]
+}
 
 fitnessFunc <- function(chromosome){
     
@@ -61,26 +39,36 @@ fitnessFunc <- function(chromosome){
     DEL <- getPlayersByPos(players,"DEL")
     DELfit <- sum(DEL$PT) + sum(3*DEL$PJ) + sum(3*DEL$F) + sum(DEL$GP) + sum(4*DEL$GC) - sum(DEL$A) - sum(2*DEL$R)
     
+    #if((dim(ARQ)[1] != 2) || (dim(DEF)[1] > 5 || dim(DEF)[1] < 4) || (dim(VOL)[1] > 5 || dim(VOL)[1] < 4) || (dim(DEL)[1] > 4 || dim(DEL)[1] < 3))
+    #    return(-9000)
+    
     ARQfit + DEFfit + VOLfit + DELfit
-    
 }
 
-crossoverFunc <- function(ga, indexes){
+crossoverFunc <- function(ga, parents){
+    parents
+    p1 <- parents[1]
+    p2 <- parents[2]
+    splitIndex <- as.integer(runif(1,1,length(p1)))
+    child1 <- p1
+    child2 <- p2
+    temp <- p1[1:splitIndex]
+    child1[1:splitIndex] <- child2[1:splitIndex]
+    child2[1:splitIndex] <- temp
     
-    splitIndex <- as.integer(runif(1,1,dim(chromo1)[1]))
-    temp <- chromo1[1:splitIndex,]
-    chromo1[1:splitIndex,] <- chromo2[1:splitIndex,]
-    chromo2[1:splitIndex,] <- temp
-    
+    list(c(child1,child2),c(NA,NA))
 }
 
-
-mutatePlayer <- function(chromosome) {
-    playerOutIndex <- runif(1,1,dim(chromosome)[1])
-    #players <- getPlayersByPos(stats.norm,chromosome[playerOutIndex,]$Pos)
-    #playerInIndex <- runif(1,1,dim(players)[1])
-    playerInIndex <- runif(1,1,dim(stats.norm)[1])
-    chromosome[playerOutIndex] <- playerInIndex
+mutationFunc <- function(ga,chromosome) {
+    playerOutIndex <- as.integer(runif(1,1,length(chromosome)))
+    #Get player position
+    pos <- getPlayersByID(stats.norm,c(chromosome[playerOutIndex]))$Pos
+    #Get all players on that position
+    players <- getPlayersByPos(stats.norm,pos)
+    #Get a new player
+    playerInID <- sample(players$ID,1)
+    #Replace player
+    chromosome[playerOutIndex] <- playerInID
     chromosome
 }
 
@@ -93,14 +81,34 @@ mutatePlayer <- function(chromosome) {
 #     chromosome
 # }
 
-InitPopulation <- function(ga){
+InitPopulation <- function(ga,tactic = "343"){
     size <- ga@popSize
+    t(replicate(size,generateTeam(tactic)))
     
 }
 
-library(GA)
-setwd("D:/workspace/AutoDT")
-source("GetPlayerStats.R")
+generateTeam <- function(tactic){
+    
+    arqcount <- 2; defcount <- 0; volcount <- 0; delcount <- 0
+    switch(tactic,
+           "442" =  {
+               defcount <- 5; volcount <- 5; delcount <- 3             
+           },
+           "343" =  {
+               defcount <- 4; volcount <- 5; delcount <- 4             
+           },
+           "433" =  {
+               defcount <- 5; volcount <- 4; delcount <- 4             
+           }
+    )
+    
+    arq <- getRandomPlayers(stats.norm,"ARQ",arqcount)
+    def <- getRandomPlayers(stats.norm,"DEF",defcount)
+    vol <- getRandomPlayers(stats.norm,"VOL",volcount)
+    del <- getRandomPlayers(stats.norm,"DEL",delcount)
+    
+    c(arq,def,vol,del)
+}
 
 #Read Stats
 #stats <- GetPlayerStats()
@@ -115,24 +123,43 @@ stats$Valor <- as.numeric(gsub("[.]","",stats$Valor))
 #Normalize or scale stats
 stats.norm <- stats
 #maybe scale instead of normalizing?
-stats.norm <-stats.norm %>% mutate_each_(funs(normalize),vars=c("PT","Prom","Reg","PJ","F","GC","GP","GR","EC","VI","A","R","PE","PA")) 
+stats.norm <- stats.norm %>% mutate_each_(funs(normalize),vars=c("PT","Prom","Reg","PJ","F","GC","GP","GR","EC","VI","A","R","PE","PA")) 
+#stats.norm <- stats.norm %>% mutate_each_(funs(as.numeric(scale(.))),vars=c("PT","Prom","Reg","PJ","F","GC","GP","GR","EC","VI","A","R","PE","PA"))
 
-GA <- ga(type = "real-valued",
-   min = rep(1,each=15),
-   max = rep(999,each=15),
-   parallel = TRUE,
-   fitness = fitnessFunc,
-   population = gareal_Population, #gaperm_Population,
-   selection = gareal_rwSelection, #gaperm_rwSelection,
-   crossover = gareal_laCrossover, #gaperm_pbxCrossover,
-   mutation = gareal_nraMutation, #gaperm_swMutation,
-   popSize = 300, pcrossover = 0.8, pmutation = 0.1,
-   elitism = max(1, round(popSize * 0.05)),
-   monitor = gaMonitor, maxiter = 300, run = 150,
-   names = paste0("x",1:15))
+formation <- "343"
+pSize <- 500
+executions <- 1
 
-summary(GA)
-sol <- as.integer(GA@solution[1,])
-finalteam <- getPlayersByID(stats.norm,sol)
-sum(finalteam$Valor)
-finalteam
+solPlayers <- {}
+
+for (i in 1:executions) {
+    
+    GA <- ga(type = "real-valued",
+             min = rep(min(stats.norm$ID),each=15),
+             max = rep(max(stats.norm$ID),each=15),
+             parallel = TRUE,
+             fitness = fitnessFunc,
+             population =  function(...) InitPopulation(...,formation), #gareal_Population, 
+             selection = gareal_lrSelection, 
+             crossover = gareal_spCrossover,
+             mutation = mutationFunc, #gareal_nraMutation,
+             popSize = pSize, pcrossover = 0.8, pmutation = 0.05,
+             elitism = max(1, round(pSize * 0.05)),
+             monitor = gaMonitor, maxiter = 200, run = 150,
+             names = paste0("x",1:15))
+    
+    
+    #summary(GA)
+    #Get GA solution
+    sol <- as.integer(GA@solution[1,])
+    #Append to final list of players
+    solPlayers <- c(solPlayers,sol)
+}
+
+finalList <- count(solPlayers)
+finalList <- finalList[with(finalList,order(-freq)),]
+
+finalTeam <- stats[finalList$x,]
+
+#sum(finalteam$Valor)
+#finalteam[with(finalteam,order(Pos)),]
