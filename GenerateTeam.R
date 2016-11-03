@@ -3,6 +3,8 @@ library(dplyr)
 setwd("D:/workspace/AutoDT")
 source("GetPlayerStats.R")
 
+budget <- 75000000
+
 normalize <- function(values) {
     max <- max(values)
     min <- min(values)
@@ -26,7 +28,7 @@ getRandomPlayers <- function(players, pos, count = 1){
 fitnessFunc <- function(chromosome){
     
     players <- getPlayersByID(stats.norm,as.integer(chromosome))
-    if(sum(players$Valor) > 75000000)
+    if(sum(players$Valor) > budget)
         return(-9000)
     
     #players <- stats[which(players == 1),]
@@ -156,11 +158,17 @@ for (i in 1:executions) {
     solPlayers <- c(solPlayers,sol)
 }
 
-finalList <- count(solPlayers)
-finalList <- finalList[with(finalList,order(-freq)),]
+#finalList <- count(solPlayers)
+finalList <- sort(table(solPlayers), decreasing=TRUE)
+#finalList <- finalList[with(finalList,order(-freq)),]
 
-finalTeam <- stats[finalList$x,]
-finalTeam <- data.frame(finalTeam,finalList$freq)
+finalTeam <- stats[names(finalList),]
+finalTeam <- data.frame(finalTeam,finalList)
+
+write.csv(x=finalTeam, file="finalteam.csv")
+
+#finalTeam <- stats[finalList$x,]
+#finalTeam <- data.frame(finalTeam,finalList$freq)
 
 #sum(finalteam$Valor)
 #finalteam[with(finalteam,order(Pos)),]
