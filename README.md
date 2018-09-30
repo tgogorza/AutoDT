@@ -1,5 +1,5 @@
 # AutoDT
-Automatic Argentina Fantasy Soccer GranDT team selector
+Automatic Argentina Fantasy Soccer GranDT team selector.  
 This weekend project scrapes players statistics and uses genetic programming to create a ranking of best candidates for a fantasy soccer team
 
 - GetPlayerStats: Scrapes a web site and generates a csv file with player stats for all the teams in Argentina First Division
